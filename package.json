@@ -1,15 +1,17 @@
 {
-  "name": "babysitter",
+  "name": "@peerstate/babysitter",
   "version": "1.0.0",
   "description": "service for managing identities and key exchanges for peerstate applications",
   "main": "index.js",
   "repository": "git@github.com:peerstate/babysitter.git",
   "author": "Bryan Goldstein",
   "license": "MIT",
+  "bin": "build/index.js",
   "scripts": {
-    "start": "node build/index.ts",
-    "build": "tsc --build tsconfig.json",
-    "watch": "ts-node-dev src/index.ts"
+    "start": "node build/index.js",
+    "build": "tsc --build tsconfig.json && chmod +x build/index.js",
+    "watch": "ts-node-dev src/index.ts",
+    "prepublish": "yarn build"
   },
   "devDependencies": {
     "@types/connect-redis": "^0.0.13",
