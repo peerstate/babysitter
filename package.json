@@ -1,6 +1,6 @@
 {
   "name": "@peerstate/babysitter",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "service for managing identities and key exchanges for peerstate applications",
   "main": "index.js",
   "repository": "git@github.com:peerstate/babysitter.git",
