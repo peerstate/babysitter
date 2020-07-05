@@ -4,6 +4,14 @@ Because someone has to make sure everyone is playing nice.
 
 This service is built to fill any gaps someone coming from a client-server architecture to a p2p one might not like. It maintains central control and moderation while enabling the benefits of direct communication that isn't totally reliant on a remote server.
 
+## Usage
+
+It is recommended to configure babysitter with environment variables, but it can also be confgured with CLI flags. Assuming you have your environment set up like the `.env.example`, running babysitter is as simple as:
+
+`npx @peerstate/babysitter`
+
+## What's there
+
 So far it consists of:
 
 1. login, logout, and key refresh functionality
