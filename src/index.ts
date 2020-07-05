@@ -15,37 +15,12 @@ import bodyParser from "body-parser";
 import { promisify } from "util";
 import { Command, flags } from "@oclif/command";
 
-const { HASH_SALT_ROUNDS } = process.env;
-
-const hash = promisify(bcrypt.hash);
-const hashPassword = (password) => {
-  return hash(password, parseInt(HASH_SALT_ROUNDS || "20000"));
-};
-
 let dotenvPath = resolve(process.cwd(), ".env.local");
 if (!existsSync(dotenvPath)) dotenvPath = resolve(process.cwd(), ".env");
 
 if (process.env.NODE_ENV !== "production") {
   require("dotenv").config({ path: dotenvPath });
 }
-
-const RedisStore = connectRedis(session);
-
-const redis = new Redis(process.env.REDIS_URL);
-const USER_KEY_PREFIX = "user";
-const USER_ID_BY_EMAIL_KEY_PREFIX = "userIdByEmail";
-const USER_ID_BY_PUBLIC_KEY = "userIdByPublicKey";
-const SECRETS_BY_USER_IDS_KEY = "secretsByUserIds";
-const key = (...keyParts: string[]) => keyParts.join(":");
-const getJSON = async (aKey: string) => {
-  const result = await redis.get(aKey);
-  if (!result) return result;
-  return JSON.parse(result);
-};
-const setJSON = async (aKey: string, value: any) => {
-  await redis.set(aKey, JSON.stringify(value));
-  return value;
-};
 
 type User = {
   id: string;
@@ -55,19 +30,71 @@ type User = {
 };
 
 class PeerstateBabysitter extends Command {
-  static description =
-    "backend service for managing peerstate sessions and keys";
+  static description = `Backend service for managing peerstate sessions and keys.
+
+     All of these flags can also be set as CONSTANT_CASE environment variables (though the flag takes precedence).`;
 
   static flags = {
     // add --version flag to show CLI version
     version: flags.version({ char: "v" }),
     help: flags.help({ char: "h" }),
+    port: flags.integer({
+      char: "p",
+      default: parseInt(process.env.PORT || "0") || 4000,
+    }),
+    hashSaltRounds: flags.integer({
+      default: parseInt(process.env.HASH_SALT_ROUNDS || "0") || 20000,
+    }),
+    redisUrl: flags.string({
+      default: process.env.REDIS_URL,
+    }),
+    redisStoreSecret: flags.string({
+      default: process.env.REDIS_STORE_SECRET,
+      required: true,
+    }),
+    corsUrl: flags.string({
+      default: process.env.CORS_URL,
+    }),
+    httpsLocalhost: flags.boolean({
+      default: !!process.env.HTTPS_LOCALHOST,
+    }),
+    jwtPublicKey: flags.string({
+      default: process.env.JWT_PUBLIC_KEY,
+      required: true,
+    }),
+    jwtPrivateKey: flags.string({
+      default: process.env.JWT_PRIVATE_KEY,
+      required: true,
+    }),
   };
 
-  static args = [{ name: "file" }];
+  static args = [];
 
   async run() {
     const { args, flags } = this.parse(PeerstateBabysitter);
+
+    const hash = promisify(bcrypt.hash);
+    const hashPassword = (password) => {
+      return hash(password, flags.hashSaltRounds);
+    };
+
+    const RedisStore = connectRedis(session);
+
+    const redis = new Redis(flags.redisUrl);
+    const USER_KEY_PREFIX = "user";
+    const USER_ID_BY_EMAIL_KEY_PREFIX = "userIdByEmail";
+    const USER_ID_BY_PUBLIC_KEY = "userIdByPublicKey";
+    const SECRETS_BY_USER_IDS_KEY = "secretsByUserIds";
+    const key = (...keyParts: string[]) => keyParts.join(":");
+    const getJSON = async (aKey: string) => {
+      const result = await redis.get(aKey);
+      if (!result) return result;
+      return JSON.parse(result);
+    };
+    const setJSON = async (aKey: string, value: any) => {
+      await redis.set(aKey, JSON.stringify(value));
+      return value;
+    };
 
     //Create a passport middleware to handle User login
     passport.use(
@@ -109,30 +136,27 @@ class PeerstateBabysitter extends Command {
       done(null, user);
     });
 
-    const { LOCAL, REDIS_STORE_SECRET, CORS_URL } = process.env;
-
-    const local = LOCAL === "true";
-    const app = local ? require("https-localhost")() : express();
-    if (!local) {
+    const app = flags.httpsLocalhost ? require("https-localhost")() : express();
+    if (flags.httpsLocalhost) {
       console.log("running app locally with fake https");
     }
 
-    app.use(
-      cors({
-        credentials: true,
-        origin: CORS_URL,
-      })
-    );
+    if (flags.corsUrl) {
+      app.use(
+        cors({
+          credentials: true,
+          origin: flags.corsUrl,
+        })
+      );
+    }
 
     app.use(bodyParser.json());
-    if (!REDIS_STORE_SECRET)
-      throw new Error("a REDIS_STORE_SECRET environment variable must be set");
     app.use(
       session({
         store: new RedisStore({
           client: redis,
         }),
-        secret: REDIS_STORE_SECRET,
+        secret: flags.redisStoreSecret,
         resave: false,
         saveUninitialized: false,
         cookie: {
@@ -213,12 +237,12 @@ class PeerstateBabysitter extends Command {
         };
 
         //Sign the JWT token and populate the payload with the user email and id
-        const token = jwt.sign({ user: body }, process.env.JWT_PRIVATE_KEY, {
+        const token = jwt.sign({ user: body }, flags.jwtPrivateKey, {
           algorithm: "RS256",
           expiresIn: "365d", //A long expiry combined with frequent key updates should maintain security and availability
         });
 
-        const serverPublicKey = process.env.JWT_PUBLIC_KEY;
+        const serverPublicKey = flags.jwtPublicKey;
 
         //Send back the token to the user
         return res.json({ token, serverPublicKey });
@@ -286,7 +310,7 @@ class PeerstateBabysitter extends Command {
       });
     });
 
-    const port = process.env.PORT || 4000;
+    const port = flags.port;
     app.listen(port, () => console.log(`🚀 Server ready on port ${port}!`));
   }
 }
