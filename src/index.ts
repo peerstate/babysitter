@@ -69,23 +69,6 @@ class PeerstateBabysitter extends Command {
   async run() {
     const { args, flags } = this.parse(PeerstateBabysitter);
 
-    if (Object.keys(flags).some((f) => f.indexOf("unsafe") === 0)) {
-      console.log("");
-      console.log("#######################################################");
-      console.log("#######################################################");
-      console.log("###############   UNSAFE: DO NOT USE     ##############");
-      console.log("#######################################################");
-      console.log("#######################################################");
-      console.log("");
-      console.log(
-        "This feature was meant for debugging the peerstate framework without"
-      );
-      console.log("security getting in the way.");
-      console.log("");
-      console.log("If this is on in production you will be fired.");
-      console.log("");
-    }
-
     //Create a passport middleware to handle User login
     passport.use(
       new LocalStrategy(
